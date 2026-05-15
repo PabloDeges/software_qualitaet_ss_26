@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  mqtt-project:
+    build: ./mqtt-project
+    image: ghcr.io/${{ env.GITHUB_REPOSITORY_LOWER }}/mqtt-project:latest
+    ports:
+      - "8081:8080"
+    environment:
+      - MQTT_BROKER_URL=${MQTT_BROKER_URL}
+      - SPRING_PROFILES_ACTIVE=prod
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  rest-api:
+    build: ./rest-api
+    image: ghcr.io/${{ env.GITHUB_REPOSITORY_LOWER }}/rest-api:latest
+    ports:
+      - "8082:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=${DB_URL}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_PROFILES_ACTIVE=prod
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  frontend:
+    build: ./frontend
+    image: ghcr.io/${{ env.GITHUB_REPOSITORY_LOWER }}/frontend:latest
+    ports:
+      - "8083:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
