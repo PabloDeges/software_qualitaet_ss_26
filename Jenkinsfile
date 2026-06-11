@@ -120,9 +120,6 @@ pipeline {
 
         // ── 4. Build Docker images (only on main branch) ─────────────────────
         stage('Docker Build') {
-            when {
-                branch 'main'
-            }
             parallel {
 
                 stage('Image: mqtt-project') {
