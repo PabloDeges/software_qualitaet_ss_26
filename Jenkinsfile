@@ -188,38 +188,6 @@ pipeline {
         }
 
         // ── 6. Deploy to server (only on main branch) ─────────────────────────
-        
-            when {
-                branch 'main'
-            }
-            steps {
-                withCredentials([sshUserPrivateKey(
-                    credentialsId: env.SSH_CREDENTIALS,
-                    keyFileVariable: 'SSH_KEY'
-                )]) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no \
-                            -i "$SSH_KEY" \
-                            ${DEPLOY_USER}@${DEPLOY_HOST} << 'ENDSSH'
-
-                            cd /opt/your-app
-
-                            # Pull the freshly built images
-                            docker pull ghcr.io/YOUR_GITHUB_USERNAME/mqtt-project:latest
-                            docker pull ghcr.io/YOUR_GITHUB_USERNAME/rest-api:latest
-                            docker pull ghcr.io/YOUR_GITHUB_USERNAME/frontend:latest
-
-                            # Restart only changed containers (zero-downtime rolling update)
-                            docker compose up -d --remove-orphans
-
-                            # Clean up dangling images
-                            docker image prune -f
-
-ENDSSH
-                    '''
-                }
-            }
-        }
     }
     // ═════════════════════════════════════════════════════════════════════════
 
