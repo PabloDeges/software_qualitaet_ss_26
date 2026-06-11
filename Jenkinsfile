@@ -159,9 +159,6 @@ pipeline {
 
         // ── 5. Push to ghcr.io (only on main branch) ─────────────────────────
         stage('Push to GHCR') {
-            when {
-                branch 'main'
-            }
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: env.GHCR_CREDENTIALS,
