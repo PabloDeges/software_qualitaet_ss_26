@@ -15,7 +15,7 @@ pipeline {
     environment {
         // GitHub Container Registry
         REGISTRY         = 'ghcr.io'
-        GITHUB_OWNER     = 'PabloDeges'       
+        GITHUB_OWNER     = 'pablodeges'       
         IMAGE_MQTT       = "${REGISTRY}/${GITHUB_OWNER}/mqtt-project"
         IMAGE_REST       = "${REGISTRY}/${GITHUB_OWNER}/rest-api"
         IMAGE_FRONTEND   = "${REGISTRY}/${GITHUB_OWNER}/frontend"
