@@ -15,17 +15,13 @@ pipeline {
     environment {
         // GitHub Container Registry
         REGISTRY         = 'ghcr.io'
-        GITHUB_OWNER     = 'YOUR_GITHUB_USERNAME'          // ← change me
+        GITHUB_OWNER     = 'PabloDeges'       
         IMAGE_MQTT       = "${REGISTRY}/${GITHUB_OWNER}/mqtt-project"
         IMAGE_REST       = "${REGISTRY}/${GITHUB_OWNER}/rest-api"
         IMAGE_FRONTEND   = "${REGISTRY}/${GITHUB_OWNER}/frontend"
 
         // Jenkins credential IDs (configure these in Manage Jenkins → Credentials)
         GHCR_CREDENTIALS = 'ghcr-credentials'   // Username + Password (PAT)
-        SSH_CREDENTIALS  = 'deploy-ssh-key'      // SSH private key
-        DEPLOY_HOST      = 'YOUR_SERVER_IP'      // ← change me
-        DEPLOY_USER      = 'ubuntu'              // ← change me
-        DEPLOY_PATH      = '/opt/your-app'       // ← change me
     }
 
     // ── Pipeline options ─────────────────────────────────────────────────────
@@ -60,22 +56,14 @@ pipeline {
         }
 
         // ── 2. Build Java services in PARALLEL ───────────────────────────────
-        // We run Maven inside Docker so no JDK/Maven installation is needed
-        // on the Jenkins agent itself.
+
         stage('Build Java') {
             parallel {
 
                 stage('Build mqtt-project') {
                     steps {
                         dir('mqtt-project') {
-                            sh '''
-                                docker run --rm \
-                                  -v "$PWD":/app \
-                                  -v maven-cache:/root/.m2 \
-                                  -w /app \
-                                  maven:3.9-eclipse-temurin-21 \
-                                  mvn -B package -DskipTests
-                            '''
+                            sh 'mvn -B package -DskipTests'
                         }
                     }
                 }
@@ -83,14 +71,7 @@ pipeline {
                 stage('Build rest-api') {
                     steps {
                         dir('rest-api') {
-                            sh '''
-                                docker run --rm \
-                                  -v "$PWD":/app \
-                                  -v maven-cache:/root/.m2 \
-                                  -w /app \
-                                  maven:3.9-eclipse-temurin-21 \
-                                  mvn -B package -DskipTests
-                            '''
+                            sh 'mvn -B package -DskipTests'
                         }
                     }
                 }
@@ -98,103 +79,44 @@ pipeline {
         }
 
         // ── 3. Test Java services in PARALLEL ────────────────────────────────
-        // Tests need a MongoDB instance. We spin one up as a Docker sidecar
-        // using the --network flag so Maven can reach it at localhost:27017.
         stage('Test Java') {
-            parallel {
+    parallel {
 
-                stage('Test mqtt-project') {
-                    steps {
-                        dir('mqtt-project') {
-                            sh '''
-                                # Create an isolated network for this test run
-                                docker network create mqtt-test-net-${BUILD_NUMBER} || true
-
-                                # Start a temporary MongoDB
-                                docker run -d --name mongo-mqtt-${BUILD_NUMBER} \
-                                  --network mqtt-test-net-${BUILD_NUMBER} \
-                                  mongo:7
-
-                                # Run tests wired to that MongoDB
-                                docker run --rm \
-                                  -v "$PWD":/app \
-                                  -v maven-cache:/root/.m2 \
-                                  --network mqtt-test-net-${BUILD_NUMBER} \
-                                  -e SPRING_DATA_MONGODB_URI=mongodb://mongo-mqtt-${BUILD_NUMBER}:27017/testdb \
-                                  -e MQTT_BROKER=tcp://localhost:1883 \
-                                  -e MQTT_USERNAME=test \
-                                  -e MQTT_PASSWORD=test \
-                                  -e MQTT_CLIENT_ID=test-client \
-                                  -w /app \
-                                  maven:3.9-eclipse-temurin-21 \
-                                  mvn -B test
-                            '''
-                        }
-                    }
-                    post {
-                        always {
-                            sh '''
-                                docker stop  mongo-mqtt-${BUILD_NUMBER} || true
-                                docker rm    mongo-mqtt-${BUILD_NUMBER} || true
-                                docker network rm mqtt-test-net-${BUILD_NUMBER} || true
-                            '''
-                            junit 'mqtt-project/target/surefire-reports/*.xml'
-                        }
-                    }
+        stage('Test mqtt-project') {
+            steps {
+                dir('mqtt-project') {
+                    sh 'mvn -B test -Dspring.data.mongodb.uri=mongodb://localhost:27017/testdb -Dmqtt.broker=tcp://localhost:1883 -Dmqtt.username=test -Dmqtt.password=test -Dmqtt.client-id=test-mqtt'
                 }
-
-                stage('Test rest-api') {
-                    steps {
-                        dir('rest-api') {
-                            sh '''
-                                docker network create rest-test-net-${BUILD_NUMBER} || true
-
-                                docker run -d --name mongo-rest-${BUILD_NUMBER} \
-                                  --network rest-test-net-${BUILD_NUMBER} \
-                                  mongo:7
-
-                                docker run --rm \
-                                  -v "$PWD":/app \
-                                  -v maven-cache:/root/.m2 \
-                                  --network rest-test-net-${BUILD_NUMBER} \
-                                  -e SPRING_DATA_MONGODB_URI=mongodb://mongo-rest-${BUILD_NUMBER}:27017/testdb \
-                                  -e MQTT_BROKER=tcp://localhost:1883 \
-                                  -e MQTT_USERNAME=test \
-                                  -e MQTT_PASSWORD=test \
-                                  -e MQTT_CLIENT_ID=test-rest-client \
-                                  -w /app \
-                                  maven:3.9-eclipse-temurin-21 \
-                                  mvn -B test
-                            '''
-                        }
-                    }
-                    post {
-                        always {
-                            sh '''
-                                docker stop  mongo-rest-${BUILD_NUMBER} || true
-                                docker rm    mongo-rest-${BUILD_NUMBER} || true
-                                docker network rm rest-test-net-${BUILD_NUMBER} || true
-                            '''
-                            junit 'rest-api/target/surefire-reports/*.xml'
-                        }
-                    }
-                }
-
-                stage('Test frontend') {
-                    steps {
-                        dir('frontend') {
-                            sh '''
-                                docker run --rm \
-                                  -v "$PWD":/app \
-                                  -w /app \
-                                  node:22-alpine \
-                                  sh -c "npm ci && npm run build"
-                            '''
-                        }
-                    }
+            }
+            post {
+                always {
+                    junit 'mqtt-project/target/surefire-reports/*.xml'
                 }
             }
         }
+
+        stage('Test rest-api') {
+            steps {
+                dir('rest-api') {
+                    sh 'mvn -B test -Dspring.data.mongodb.uri=mongodb://localhost:27017/testdb -Dmqtt.broker=tcp://localhost:1883 -Dmqtt.username=test -Dmqtt.password=test -Dmqtt.client-id=test-rest'
+                }
+            }
+            post {
+                always {
+                    junit 'rest-api/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Test frontend') {
+            steps {
+                dir('frontend') {
+                    sh 'npm ci && npm run build'
+                }
+            }
+        }
+    }
+}
 
         // ── 4. Build Docker images (only on main branch) ─────────────────────
         stage('Docker Build') {
@@ -266,7 +188,7 @@ pipeline {
         }
 
         // ── 6. Deploy to server (only on main branch) ─────────────────────────
-        stage('Deploy') {
+        
             when {
                 branch 'main'
             }
