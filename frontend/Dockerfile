@@ -1,15 +1,12 @@
 # Build stage
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM node:22-alpine AS build
 WORKDIR /app
-COPY pom.xml .
-# Cache dependencies first (faster rebuilds)
-RUN mvn dependency:go-offline -B
-COPY src ./src
-RUN mvn package -DskipTests -B
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 
-# Run stage
-FROM eclipse-temurin:21-jre-alpine
-WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Serve with nginx
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80

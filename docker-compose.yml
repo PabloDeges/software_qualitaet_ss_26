@@ -1,0 +1,76 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  docker-compose.yml  –  production deployment
+#  Place this file in /opt/your-app on the server together with a .env file.
+#
+#  Required .env variables (create on the server, never commit to git):
+#    GITHUB_OWNER       your GitHub username / org (lowercase)
+#    MQTT_BROKER_URL    e.g. tcp://broker.hivemq.com:1883
+#    MQTT_USERNAME      MQTT broker username
+#    MQTT_PASSWORD      MQTT broker password
+#    MONGO_URI          e.g. mongodb://mongo:27017/bookapp
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── MongoDB ────────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - app-network
+
+  # ── MQTT subscriber / ingestion service ───────────────────────────────────
+  mqtt-project:
+    image: ghcr.io/${GITHUB_OWNER}/mqtt-project:latest
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_DATA_MONGODB_URI: ${MONGO_URI}
+      MQTT_BROKER:             ${MQTT_BROKER_URL}
+      MQTT_USERNAME:           ${MQTT_USERNAME}
+      MQTT_PASSWORD:           ${MQTT_PASSWORD}
+      MQTT_CLIENT_ID:          mqtt-service-prod
+      SPRING_PROFILES_ACTIVE:  prod
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  # ── REST API ───────────────────────────────────────────────────────────────
+  rest-api:
+    image: ghcr.io/${GITHUB_OWNER}/rest-api:latest
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    environment:
+      SPRING_DATA_MONGODB_URI: ${MONGO_URI}
+      MQTT_BROKER:             ${MQTT_BROKER_URL}
+      MQTT_USERNAME:           ${MQTT_USERNAME}
+      MQTT_PASSWORD:           ${MQTT_PASSWORD}
+      MQTT_CLIENT_ID:          rest-api-prod
+      SPRING_PROFILES_ACTIVE:  prod
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  # ── Vue 3 / Vite frontend ─────────────────────────────────────────────────
+  frontend:
+    image: ghcr.io/${GITHUB_OWNER}/frontend:latest
+    restart: unless-stopped
+    ports:
+      - "8083:80"
+    networks:
+      - app-network
+
+volumes:
+  mongo-data:
+
+networks:
+  app-network:
+    driver: bridge

@@ -1,0 +1,110 @@
+name: Build & Deploy Microservices
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  # Lowercased automatically — GitHub Container Registry requires lowercase
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
+
+jobs:
+  # ── Build & push all 3 images in PARALLEL ──────────────────────────────────
+  build-mqtt-project:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push mqtt-project
+        uses: docker/build-push-action@v5
+        with:
+          context: ./mqtt-project
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ${{ env.IMAGE_PREFIX }}/mqtt-project:latest
+
+  build-rest-api:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push rest-api
+        uses: docker/build-push-action@v5
+        with:
+          context: ./rest-api
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ${{ env.IMAGE_PREFIX }}/rest-api:latest
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ${{ env.IMAGE_PREFIX }}/frontend:latest
+
+  # ── Deploy: runs only after ALL 3 builds succeed ───────────────────────────
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build-mqtt-project, build-rest-api, build-frontend]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            # Log in to registry on the server
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io \
+              -u ${{ github.actor }} --password-stdin
+
+            # Pull latest images for all services
+            docker pull ghcr.io/${{ github.repository_owner }}/mqtt-project:latest
+            docker pull ghcr.io/${{ github.repository_owner }}/rest-api:latest
+            docker pull ghcr.io/${{ github.repository_owner }}/frontend:latest
+
+            # Navigate to your app folder on the server
+            cd /opt/your-app
+
+            # Restart all services with zero-downtime rolling update
+            docker compose up -d --remove-orphans
