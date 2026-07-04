@@ -16,6 +16,6 @@ public class GpsData {
     private double latitude;
     private double longitude;
     private double altitude;
-    private Map<String, Object> rawPayload;   // store full JSON just in case
+    private Map<String, Object> rawPayload;  
     private LocalDateTime timestamp;
 }

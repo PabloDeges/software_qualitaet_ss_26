@@ -64,7 +64,7 @@
   
   onMounted(() => {
     fetchStatus()
-    interval = setInterval(fetchStatus, 2000)
+    interval = setInterval(fetchStatus, 100)
   })
   
   onUnmounted(() => clearInterval(interval))
@@ -79,7 +79,7 @@
   }
   
   .light-bulb {
-    width: 70px;
+    width: 80px;
     text-align: center;
     padding: 12px 8px;
     border-radius: 10px;

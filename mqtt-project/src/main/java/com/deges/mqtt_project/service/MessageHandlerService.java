@@ -1,5 +1,6 @@
 package com.deges.mqtt_project.service;
 
+
 import com.deges.mqtt_project.model.GpsData;
 import com.deges.mqtt_project.model.S7Temperature;
 import com.deges.mqtt_project.model.WagoStatus;
@@ -8,6 +9,8 @@ import com.deges.mqtt_project.repository.S7TemperatureRepository;
 import com.deges.mqtt_project.repository.WagoStatusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import tools.jackson.databind.ObjectMapper;
+
 import org.springframework.integration.mqtt.support.MqttHeaders;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Service;
@@ -20,9 +23,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MessageHandlerService {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();   
+
     private final WagoStatusRepository wagoRepo;
     private final S7TemperatureRepository s7Repo;
     private final GpsDataRepository gpsRepo;
+
 
     public void handleMessage(Message<?> message) {
         // Get the topic so we know how to parse the payload
@@ -37,14 +43,17 @@ public class MessageHandlerService {
             if (topic.equals("Wago750/Status") || topic.equals("Random/Integer")) {
                 handleWago(payload);
 
-            } else if (topic.startsWith("S7 1500/Temperatur/")) {
-                String type = topic.replace("S7 1500/Temperatur/", ""); // "Ist", "Soll", or "Differenz"
+            } else if (topic.startsWith("S7_1500/Temperatur/")) {
+                String type = topic.replace("S7_1500/Temperatur/", ""); // "Ist", "Soll", or "Differenz"
                 handleTemperature(type, payload);
 
             } 
-            // else if (topic.contains("GNSS")) {
-            //     handleGps(payload);
-            // }
+         else if (topic.contains("GNSS")) {
+            handleGps(payload);
+        }
+         else {
+            log.info("Unhandled topic: [{}]", topic);
+        }
 
         } catch (Exception e) {
             log.error("Failed to process message on topic {}: {}", topic, e.getMessage());
@@ -71,6 +80,8 @@ public class MessageHandlerService {
     }
 
     private void handleTemperature(String type, String payload) {
+
+        log.info("handleTemperature called with type={} payload={}", type, payload);
         double value = Double.parseDouble(payload.trim());
 
         S7Temperature temp = new S7Temperature();
@@ -82,20 +93,21 @@ public class MessageHandlerService {
         log.info("Saved S7 temperature [{}]: {}", type, value);
     }
 
-    // @SuppressWarnings("unchecked")
-    // private void handleGps(String payload) throws Exception {
-    //     Map<String, Object> raw = objectMapper.readValue(payload, Map.class);
+    @SuppressWarnings("unchecked")
+    private void handleGps(String payload) throws Exception {
+        log.info("HANDLE GPS CALLED ########################################");
+        Map<String, Object> raw = objectMapper.readValue(payload, Map.class);
 
-    //     GpsData gps = new GpsData();
-    //     gps.setLatitude(toDouble(raw.get("Lat")));
-    //     gps.setLongitude(toDouble(raw.get("Lon")));
-    //     gps.setAltitude(toDouble(raw.get("Alt")));
-    //     gps.setRawPayload(raw);
-    //     gps.setTimestamp(LocalDateTime.now());
+        GpsData gps = new GpsData();
+        gps.setLatitude(toDouble(raw.get("latitude")));
+        gps.setLongitude(toDouble(raw.get("longtitude")));
+        gps.setAltitude(toDouble(raw.get("altitude")));
+        gps.setRawPayload(raw);
+        gps.setTimestamp(LocalDateTime.now());
 
-    //     gpsRepo.save(gps);
-    //     log.info("Saved GPS: lat={}, lon={}, alt={}", gps.getLatitude(), gps.getLongitude(), gps.getAltitude());
-    // }
+        gpsRepo.save(gps);
+        log.info("Saved GPS: lat={}, lon={}, alt={}", gps.getLatitude(), gps.getLongitude(), gps.getAltitude());
+    }
 
     private double toDouble(Object val) {
         if (val == null) return 0.0;

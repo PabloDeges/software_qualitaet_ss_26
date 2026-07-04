@@ -18,14 +18,7 @@
       </div>
       <p v-else class="no-data">No GPS data available yet.</p>
   
-      <div v-if="gps" class="map-link">
-        
-          :href="`https://www.openstreetmap.org/?mlat=${gps.latitude}&mlon=${gps.longitude}&zoom=15`"
-          target="_blank"
-        <a>
-          View on OpenStreetMap
-        </a>
-      </div>
+      
     </div>
   </template>
   

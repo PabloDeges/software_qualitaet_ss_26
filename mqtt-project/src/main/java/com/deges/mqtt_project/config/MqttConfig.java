@@ -33,11 +33,11 @@ public class MqttConfig {
     // Topics to subscribe to
     private static final String[] TOPICS = {
         "Wago750/Status",
-        "S7 1500/Temperatur/Ist",
-        "S7 1500/Temperatur/Soll",
-        "S7 1500/Temperatur/Differenz",
+        "S7_1500/Temperatur/Ist",
+        "S7_1500/Temperatur/Soll",
+        "S7_1500/Temperatur/Differenz",
         "LocCheck/862315069391414/Data/GNSS",
-        "Random/Integer"   // fallback for testing when SPS is offline
+        "Random/Integer"  // fallback when SPS is offline
     };
 
     @Bean
